@@ -2286,14 +2286,16 @@ static int ram_find_and_save_block(RAMState *rs)
             }
         }
     } else {
-        unsigned long page;
-        while (ram_list_dequeue_dirty(&page)) {
-            pss->block = qemu_get_ram_block(page << TARGET_PAGE_BITS);
-            pss->page = page;
-            pss->complete_round = false;
-            pages = ram_save_host_page(rs, pss);
-            if (pages) {
-                break;
+        if (!get_queued_page(rs, pss)) {
+            unsigned long page;
+            while (ram_list_dequeue_dirty(&page)) {
+                pss->block = qemu_get_ram_block(page << TARGET_PAGE_BITS);
+                pss->page = page;
+                pss->complete_round = false;
+                pages = ram_save_host_page(rs, pss);
+                if (pages) {
+                    break;
+                }
             }
         }
     }
