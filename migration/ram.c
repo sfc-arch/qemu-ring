@@ -2286,7 +2286,14 @@ static int ram_find_and_save_block(RAMState *rs)
             }
         }
     } else {
-        if (!get_queued_page(rs, pss)) {
+        while (get_queued_page(rs, pss)) {
+            pages = ram_save_host_page(rs, pss);
+            if (pages) {
+                break;
+            }
+        }
+
+        if (!pages) {
             unsigned long page;
             while (ram_list_dequeue_dirty(&page)) {
                 pss->block = qemu_get_ram_block(page << TARGET_PAGE_BITS);
