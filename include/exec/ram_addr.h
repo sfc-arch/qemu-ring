@@ -27,6 +27,8 @@
 #include "exec/ramblock.h"
 #include "exec/exec-all.h"
 #include "qemu/rcu.h"
+#include "qemu/error-report.h"
+#include "migration/misc.h"
 
 extern uint64_t total_dirty_pages;
 
@@ -282,7 +284,11 @@ static inline void cpu_physical_memory_set_dirty_flag(ram_addr_t addr,
 
     blocks = qatomic_rcu_read(&ram_list.dirty_memory[client]);
 
-    set_bit_atomic(offset, blocks->blocks[idx]);
+    if (test_and_set_bit_atomic(offset, blocks->blocks[idx]) && migration_has_dirty_ring() && client == DIRTY_MEMORY_MIGRATION) {
+        if (!ram_list_enqueue_dirty(page)) {
+            error_report("Failed to enqueue dirty page %lx, dirty-ring is full.", page);
+        }
+    }
 }
 
 static inline void cpu_physical_memory_set_dirty_range(ram_addr_t start,
@@ -313,8 +319,19 @@ static inline void cpu_physical_memory_set_dirty_range(ram_addr_t start,
             unsigned long next = MIN(end, base + DIRTY_MEMORY_BLOCK_SIZE);
 
             if (likely(mask & (1 << DIRTY_MEMORY_MIGRATION))) {
-                bitmap_set_atomic(blocks[DIRTY_MEMORY_MIGRATION]->blocks[idx],
-                                  offset, next - page);
+                if (!migration_has_dirty_ring()) {
+                    bitmap_set_atomic(blocks[DIRTY_MEMORY_MIGRATION]->blocks[idx],
+                                      offset, next - page);
+                } else {
+                    for (unsigned long p = page; p < next; p++) {
+                        if (test_and_set_bit_atomic(p % DIRTY_MEMORY_BLOCK_SIZE,
+                                                    blocks[DIRTY_MEMORY_MIGRATION]->blocks[p / DIRTY_MEMORY_BLOCK_SIZE])) {
+                            if (!ram_list_enqueue_dirty(p)) {
+                                error_report("Failed to enqueue dirty page %lx, dirty-ring is full.", p);
+                            }
+                        }
+                    }
+                }
             }
             if (unlikely(mask & (1 << DIRTY_MEMORY_VGA))) {
                 bitmap_set_atomic(blocks[DIRTY_MEMORY_VGA]->blocks[idx],
@@ -384,9 +401,24 @@ uint64_t cpu_physical_memory_set_dirty_lebitmap(unsigned long *bitmap,
                     qatomic_or(&blocks[DIRTY_MEMORY_VGA][idx][offset], temp);
 
                     if (global_dirty_tracking) {
-                        qatomic_or(
-                                &blocks[DIRTY_MEMORY_MIGRATION][idx][offset],
-                                temp);
+                        if (migration_has_dirty_ring()) {
+                            for (j = 0; j < BITS_PER_LONG; j++) {
+                                if ((temp & (1 << j)) == 0) {
+                                    continue;
+                                }
+
+                                if (test_and_set_bit_atomic(j, &blocks[DIRTY_MEMORY_MIGRATION][idx][offset])) {
+                                    if (!ram_list_enqueue_dirty(page + BITS_PER_LONG * k + j)) {
+                                        error_report("Failed to enqueue dirty page %lx, dirty-ring is full.", page + BITS_PER_LONG * k + j);
+                                    }
+                                }
+                            }
+                        } else {
+                            qatomic_or(
+                                    &blocks[DIRTY_MEMORY_MIGRATION][idx][offset],
+                                    temp);
+                        }
+
                         if (unlikely(
                             global_dirty_tracking & GLOBAL_DIRTY_DIRTY_RATE)) {
                             total_dirty_pages += nbits;
@@ -473,7 +505,7 @@ static inline void cpu_physical_memory_clear_dirty_range(ram_addr_t start,
 }
 
 
-/* Called with RCU critical section */
+/* Called with RCU critical section and ram_list.mutex held */
 static inline
 uint64_t cpu_physical_memory_sync_dirty_bitmap(RAMBlock *rb,
                                                ram_addr_t start,
@@ -484,8 +516,31 @@ uint64_t cpu_physical_memory_sync_dirty_bitmap(RAMBlock *rb,
     uint64_t num_dirty = 0;
     unsigned long *dest = rb->bmap;
 
+    if (migration_has_dirty_ring()) {
+        for (unsigned long rpos = ram_list.dirty_ring.rpos; rpos != ram_list.dirty_ring.wpos; rpos++) {
+            unsigned long page = ram_list.dirty_ring.buffer[rpos & ram_list.dirty_ring.mask];
+            if (page >= start >> TARGET_PAGE_BITS &&
+                page < (start + length) >> TARGET_PAGE_BITS) {
+                unsigned long k = page - (start >> TARGET_PAGE_BITS);
+                if (!test_and_set_bit(k, dest)) {
+                    num_dirty++;
+                }
+            }
+        }
+
+        if (num_dirty) {
+            cpu_physical_memory_dirty_bits_cleared(start, length);
+        }
+
+        if (rb->clear_bmap) {
+            clear_bmap_set(rb, start >> TARGET_PAGE_BITS,
+                           length >> TARGET_PAGE_BITS);
+        } else {
+            memory_region_clear_dirty_bitmap(rb->mr, start, length);
+        }
+    }
     /* start address and length is aligned at the start of a word? */
-    if (((word * BITS_PER_LONG) << TARGET_PAGE_BITS) ==
+    else if (((word * BITS_PER_LONG) << TARGET_PAGE_BITS) ==
          (start + rb->offset) &&
         !(length & ((BITS_PER_LONG << TARGET_PAGE_BITS) - 1))) {
         int k;

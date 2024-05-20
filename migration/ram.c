@@ -2214,7 +2214,11 @@ static int ram_save_host_page(RAMState *rs, PageSearchStatus *pss)
             return tmppages;
         }
 
-        pss_find_next_dirty(pss);
+        if (!migration_has_dirty_ring()) {
+            pss_find_next_dirty(pss);
+        } else {
+            break;
+        }
     } while (pss_within_range(pss));
 
     pss_host_page_finish(pss);
@@ -2260,24 +2264,37 @@ static int ram_find_and_save_block(RAMState *rs)
 
     pss_init(pss, rs->last_seen_block, rs->last_page);
 
-    while (true){
-        if (!get_queued_page(rs, pss)) {
-            /* priority queue empty, so just search for something dirty */
-            int res = find_dirty_block(rs, pss);
-            if (res != PAGE_DIRTY_FOUND) {
-                if (res == PAGE_ALL_CLEAN) {
-                    break;
-                } else if (res == PAGE_TRY_AGAIN) {
-                    continue;
-                } else if (res < 0) {
-                    pages = res;
-                    break;
+    if (!migration_has_dirty_ring()) {
+        while (true){
+            if (!get_queued_page(rs, pss)) {
+                /* priority queue empty, so just search for something dirty */
+                int res = find_dirty_block(rs, pss);
+                if (res != PAGE_DIRTY_FOUND) {
+                    if (res == PAGE_ALL_CLEAN) {
+                        break;
+                    } else if (res == PAGE_TRY_AGAIN) {
+                        continue;
+                    } else if (res < 0) {
+                        pages = res;
+                        break;
+                    }
                 }
             }
+            pages = ram_save_host_page(rs, pss);
+            if (pages) {
+                break;
+            }
         }
-        pages = ram_save_host_page(rs, pss);
-        if (pages) {
-            break;
+    } else {
+        unsigned long page;
+        while (ram_list_dequeue_dirty(&page)) {
+            pss->block = qemu_get_ram_block(page << TARGET_PAGE_BITS);
+            pss->page = page;
+            pss->complete_round = false;
+            pages = ram_save_host_page(rs, pss);
+            if (pages) {
+                break;
+            }
         }
     }
 
@@ -2746,7 +2763,9 @@ static void ram_list_init_bitmaps(void)
              * guest memory.
              */
             block->bmap = bitmap_new(pages);
-            bitmap_set(block->bmap, 0, pages);
+            if (!migration_has_dirty_ring()) {
+                bitmap_set(block->bmap, 0, pages);
+            }
             if (migrate_mapped_ram()) {
                 block->file_bmap = bitmap_new(pages);
             }
@@ -3313,8 +3332,13 @@ static void ram_state_pending_estimate(void *opaque, uint64_t *must_precopy,
 {
     RAMState **temp = opaque;
     RAMState *rs = *temp;
+    uint64_t remaining_size;
 
-    uint64_t remaining_size = rs->migration_dirty_pages * TARGET_PAGE_SIZE;
+    if (!migration_has_dirty_ring()) {
+        remaining_size = rs->migration_dirty_pages * TARGET_PAGE_SIZE;
+    } else {
+        remaining_size = ram_list_dirty_ring_size() * TARGET_PAGE_SIZE;
+    }
 
     if (migrate_postcopy_ram()) {
         /* We can do postcopy, and all the data is postcopiable */
@@ -3339,7 +3363,11 @@ static void ram_state_pending_exact(void *opaque, uint64_t *must_precopy,
         bql_unlock();
     }
 
-    remaining_size = rs->migration_dirty_pages * TARGET_PAGE_SIZE;
+    if (!migration_has_dirty_ring()) {
+        remaining_size = rs->migration_dirty_pages * TARGET_PAGE_SIZE;
+    } else {
+        remaining_size = ram_list_dirty_ring_size() * TARGET_PAGE_SIZE;
+    }
 
     if (migrate_postcopy_ram()) {
         /* We can do postcopy, and all the data is postcopiable */

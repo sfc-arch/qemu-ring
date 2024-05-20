@@ -667,7 +667,12 @@ static void kvm_dirty_ring_mark_page(KVMState *s, uint32_t as_id,
         return;
     }
 
-    set_bit(offset, mem->dirty_bmap);
+    if (!test_and_set_bit(offset, mem->dirty_bmap) && migration_has_dirty_ring()) {
+        unsigned long pfn = BIT_WORD(mem->ram_start_offset >> TARGET_PAGE_BITS) + offset;
+        if(!ram_list_enqueue_dirty(pfn)) {
+            error_report("kvm_dirty_ring_mark_page: dirty ring is full");
+        }
+    }
 }
 
 static bool dirty_gfn_is_dirtied(struct kvm_dirty_gfn *gfn)

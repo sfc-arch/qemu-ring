@@ -5,6 +5,7 @@
 #include "qemu/thread.h"
 #include "qemu/rcu.h"
 #include "qemu/rcu_queue.h"
+#include "exec/cpu-common.h"
 
 typedef struct RAMBlockNotifier RAMBlockNotifier;
 
@@ -44,6 +45,25 @@ typedef struct {
     unsigned long *blocks[];
 } DirtyMemoryBlocks;
 
+typedef struct {
+    /* The starting address of the dirty-ring. It is NULL if the dirty-ring is not enabled. */
+    unsigned long *buffer;
+    /*
+     * The number of elements in the dirty-ring.
+     * Must be a power of 2. Note that the actual limit of elements that can be inserted is dirty_ring_size - 1 due to ring-buffer constraints.
+     */
+    unsigned long size;
+    /* The mask for obtaining the index in the dirty-ring. */
+    unsigned long mask;
+    /*
+     * The current read position in the dirty-ring. If dirty_ring_rpos == dirty_ring_wpos, the dirty-ring is empty.
+     * If dirty_ring_wpos - dirty_ring_rpos == dirty_ring_size, the dirty-ring is full.
+     */
+    unsigned long rpos;
+    /* The current write position in the dirty-ring. */
+    unsigned long wpos;
+} DirtyRing;
+
 typedef struct RAMList {
     QemuMutex mutex;
     RAMBlock *mru_block;
@@ -52,6 +72,8 @@ typedef struct RAMList {
     DirtyMemoryBlocks *dirty_memory[DIRTY_MEMORY_NUM];
     uint32_t version;
     QLIST_HEAD(, RAMBlockNotifier) ramblock_notifiers;
+    /* Used only when dirty-ring is enabled */
+    DirtyRing dirty_ring;
 } RAMList;
 extern RAMList ram_list;
 
@@ -63,6 +85,8 @@ extern RAMList ram_list;
 
 void qemu_mutex_lock_ramlist(void);
 void qemu_mutex_unlock_ramlist(void);
+/* Called from RCU critical section */
+RAMBlock *qemu_get_ram_block(ram_addr_t addr);
 
 struct RAMBlockNotifier {
     void (*ram_block_added)(RAMBlockNotifier *n, void *host, size_t size,
@@ -79,6 +103,10 @@ void ram_block_notifier_remove(RAMBlockNotifier *n);
 void ram_block_notify_add(void *host, size_t size, size_t max_size);
 void ram_block_notify_remove(void *host, size_t size, size_t max_size);
 void ram_block_notify_resize(void *host, size_t old_size, size_t new_size);
+
+bool ram_list_enqueue_dirty(unsigned long page);
+bool ram_list_dequeue_dirty(unsigned long *page);
+unsigned long ram_list_dirty_ring_size(void);
 
 GString *ram_block_format(void);
 

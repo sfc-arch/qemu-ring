@@ -783,7 +783,7 @@ AddressSpace *cpu_get_address_space(CPUState *cpu, int asidx)
 }
 
 /* Called from RCU critical section */
-static RAMBlock *qemu_get_ram_block(ram_addr_t addr)
+RAMBlock *qemu_get_ram_block(ram_addr_t addr)
 {
     RAMBlock *block;
 
@@ -1804,6 +1804,26 @@ static void dirty_memory_extend(ram_addr_t old_ram_size,
     }
 }
 
+/* Called with ram_list.mutex held */
+static bool dirty_ring_init(Error **errp)
+{
+    unsigned long dirty_ring_size = migration_get_dirty_ring_size();
+
+    ram_list.dirty_ring.buffer = g_malloc(sizeof(ram_list.dirty_ring.buffer[0]) * dirty_ring_size);
+
+    if (ram_list.dirty_ring.buffer == NULL) {
+        error_setg(errp, "Failed to allocate dirty ring buffer");
+        return false;
+    }
+
+    ram_list.dirty_ring.size = dirty_ring_size;
+    ram_list.dirty_ring.mask = dirty_ring_size - 1;
+    ram_list.dirty_ring.rpos = 0;
+    ram_list.dirty_ring.wpos = 0;
+
+    return true;
+}
+
 static void ram_block_add(RAMBlock *new_block, Error **errp)
 {
     const bool noreserve = qemu_ram_is_noreserve(new_block);
@@ -1868,6 +1888,13 @@ static void ram_block_add(RAMBlock *new_block, Error **errp)
     if (new_ram_size > old_ram_size) {
         dirty_memory_extend(old_ram_size, new_ram_size);
     }
+
+    if (migration_has_dirty_ring() && ram_list.dirty_ring.buffer == NULL) {
+        if (!dirty_ring_init(errp)) {
+            goto out_free;
+        }
+    }
+
     /* Keep the list sorted from biggest to smallest block.  Unlike QTAILQ,
      * QLIST (which has an RCU-friendly variant) does not have insertion at
      * tail, so save the last element in last_block.
@@ -3885,4 +3912,45 @@ bool ram_block_discard_is_required(void)
 {
     return qatomic_read(&ram_block_discard_required_cnt) ||
            qatomic_read(&ram_block_coordinated_discard_required_cnt);
+}
+
+bool ram_list_enqueue_dirty(unsigned long page)
+{
+    qemu_mutex_lock_ramlist();
+
+
+    if (ram_list.dirty_ring.wpos - ram_list.dirty_ring.rpos == (ram_list.dirty_ring.size)) {
+        qemu_mutex_unlock_ramlist();
+
+        return false;
+    }
+
+    ram_list.dirty_ring.buffer[ram_list.dirty_ring.wpos & ram_list.dirty_ring.mask] = page;
+    ram_list.dirty_ring.wpos++;
+
+    qemu_mutex_unlock_ramlist();
+
+    return true;
+}
+
+bool ram_list_dequeue_dirty(unsigned long *page)
+{
+    qemu_mutex_lock_ramlist();
+
+    if (ram_list.dirty_ring.rpos == ram_list.dirty_ring.wpos) {
+        qemu_mutex_unlock_ramlist();
+
+        return false;
+    }
+
+    *page = ram_list.dirty_ring.buffer[ram_list.dirty_ring.rpos & ram_list.dirty_ring.mask];
+    ram_list.dirty_ring.rpos++;
+
+    qemu_mutex_unlock_ramlist();
+
+    return true;
+}
+
+unsigned long ram_list_dirty_ring_size(void) {
+    return ram_list.dirty_ring.wpos - ram_list.dirty_ring.rpos;
 }
