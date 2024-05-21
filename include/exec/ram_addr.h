@@ -284,7 +284,7 @@ static inline void cpu_physical_memory_set_dirty_flag(ram_addr_t addr,
 
     blocks = qatomic_rcu_read(&ram_list.dirty_memory[client]);
 
-    if (test_and_set_bit_atomic(offset, blocks->blocks[idx]) && migration_has_dirty_ring() && client == DIRTY_MEMORY_MIGRATION) {
+    if (!test_and_set_bit_atomic(offset, blocks->blocks[idx]) && migration_has_dirty_ring() && client == DIRTY_MEMORY_MIGRATION) {
         if (!ram_list_enqueue_dirty(page)) {
             error_report("Failed to enqueue dirty page %lx, dirty-ring is full.", page);
         }
@@ -324,7 +324,7 @@ static inline void cpu_physical_memory_set_dirty_range(ram_addr_t start,
                                       offset, next - page);
                 } else {
                     for (unsigned long p = page; p < next; p++) {
-                        if (test_and_set_bit_atomic(p % DIRTY_MEMORY_BLOCK_SIZE,
+                        if (!test_and_set_bit_atomic(p % DIRTY_MEMORY_BLOCK_SIZE,
                                                     blocks[DIRTY_MEMORY_MIGRATION]->blocks[p / DIRTY_MEMORY_BLOCK_SIZE])) {
                             if (!ram_list_enqueue_dirty(p)) {
                                 error_report("Failed to enqueue dirty page %lx, dirty-ring is full.", p);
@@ -407,7 +407,7 @@ uint64_t cpu_physical_memory_set_dirty_lebitmap(unsigned long *bitmap,
                                     continue;
                                 }
 
-                                if (test_and_set_bit_atomic(j, &blocks[DIRTY_MEMORY_MIGRATION][idx][offset])) {
+                                if (!test_and_set_bit_atomic(j, &blocks[DIRTY_MEMORY_MIGRATION][idx][offset])) {
                                     if (!ram_list_enqueue_dirty(page + BITS_PER_LONG * k + j)) {
                                         error_report("Failed to enqueue dirty page %lx, dirty-ring is full.", page + BITS_PER_LONG * k + j);
                                     }
