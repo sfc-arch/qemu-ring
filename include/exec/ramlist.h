@@ -45,6 +45,12 @@ typedef struct {
     unsigned long *blocks[];
 } DirtyMemoryBlocks;
 
+/* Ring buffer for dirty memory tracking.
+ * Implemented as a Multi-Producers, Single-Consumer (MPSC) ring buffer.
+ * Multiple threads write using ram_list_enqueue_dirty() or ram_list_enqueue_dirty_unsafe(), and a single thread (e.g. migration thread) reads using ram_list_dequeue_dirty().
+ * This ring buffer does not support deletion of intermediate elements. Therefore, the dirty bitmap must be checked to determine if a region has been cleared.
+ * For performance, when enqueuing a range, it is recommended to lock dirty_ring.producer_mutex before the loop and unlock it after the loop, and use ram_list_enqueue_dirty_unsafe().
+ */
 typedef struct {
     /* The starting address of the dirty-ring. It is NULL if the dirty-ring is not enabled. */
     unsigned long *buffer;
@@ -55,12 +61,20 @@ typedef struct {
     unsigned long size;
     /* The mask for obtaining the index in the dirty-ring. */
     unsigned long mask;
+    /* The mutex for protecting the dirty-ring. */
+    QemuMutex producer_mutex;
     /*
      * The current read position in the dirty-ring. If dirty_ring_rpos == dirty_ring_wpos, the dirty-ring is empty.
      * If dirty_ring_wpos - dirty_ring_rpos == dirty_ring_size, the dirty-ring is full.
      */
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+    _Alignas(64) /* Countermeasure against False Sharing */
+#endif
     unsigned long rpos;
     /* The current write position in the dirty-ring. */
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+    _Alignas(64) /* Countermeasure against False Sharing */
+#endif
     unsigned long wpos;
 } DirtyRing;
 
@@ -85,6 +99,8 @@ extern RAMList ram_list;
 
 void qemu_mutex_lock_ramlist(void);
 void qemu_mutex_unlock_ramlist(void);
+void qemu_mutex_lock_ramlist_dirty_ring(void);
+void qemu_mutex_unlock_ramlist_dirty_ring(void);
 /* Called from RCU critical section */
 RAMBlock *qemu_get_ram_block(ram_addr_t addr);
 
@@ -104,7 +120,10 @@ void ram_block_notify_add(void *host, size_t size, size_t max_size);
 void ram_block_notify_remove(void *host, size_t size, size_t max_size);
 void ram_block_notify_resize(void *host, size_t old_size, size_t new_size);
 
+/* Called with ram_list.dirty_ring.producer_mutex held */
 bool ram_list_enqueue_dirty(unsigned long page);
+/* Called *WITHOUT* ram_list.dirty_ring.producer_mutex held */
+bool ram_list_enqueue_dirty_unsafe(unsigned long page);
 bool ram_list_dequeue_dirty(unsigned long *page);
 unsigned long ram_list_dirty_ring_size(void);
 

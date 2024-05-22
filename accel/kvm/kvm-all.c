@@ -669,7 +669,7 @@ static void kvm_dirty_ring_mark_page(KVMState *s, uint32_t as_id,
 
     if (!test_and_set_bit(offset, mem->dirty_bmap) && migration_has_dirty_ring()) {
         unsigned long pfn = BIT_WORD(mem->ram_start_offset >> TARGET_PAGE_BITS) + offset;
-        if(!ram_list_enqueue_dirty(pfn)) {
+        if(!ram_list_enqueue_dirty_unsafe(pfn)) {
             error_report("kvm_dirty_ring_mark_page: dirty ring is full");
         }
     }
@@ -727,6 +727,9 @@ static uint32_t kvm_dirty_ring_reap_one(KVMState *s, CPUState *cpu)
     assert(dirty_gfns && ring_size);
     trace_kvm_dirty_ring_reap_vcpu(cpu->cpu_index);
 
+    if (migration_has_dirty_ring()) {
+        qemu_mutex_lock_ramlist_dirty_ring();
+    }
     while (true) {
         cur = &dirty_gfns[fetch % ring_size];
         if (!dirty_gfn_is_dirtied(cur)) {
@@ -739,6 +742,10 @@ static uint32_t kvm_dirty_ring_reap_one(KVMState *s, CPUState *cpu)
         fetch++;
         count++;
     }
+    if (migration_has_dirty_ring()) {
+        qemu_mutex_unlock_ramlist_dirty_ring();
+    }
+
     cpu->kvm_fetch_index = fetch;
     cpu->dirty_pages += count;
 
