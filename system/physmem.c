@@ -1118,16 +1118,6 @@ void qemu_mutex_unlock_ramlist(void)
     qemu_mutex_unlock(&ram_list.mutex);
 }
 
-void qemu_mutex_lock_ramlist_dirty_ring(void)
-{
-    qemu_mutex_lock(&ram_list.dirty_ring.producer_mutex);
-}
-
-void qemu_mutex_unlock_ramlist_dirty_ring(void)
-{
-    qemu_mutex_unlock(&ram_list.dirty_ring.producer_mutex);
-}
-
 GString *ram_block_format(void)
 {
     RAMBlock *block;
@@ -1830,8 +1820,6 @@ static bool dirty_ring_init(Error **errp)
     ram_list.dirty_ring.mask = dirty_ring_size - 1;
     ram_list.dirty_ring.rpos = 0;
     ram_list.dirty_ring.wpos = 0;
-
-    qemu_mutex_init(&ram_list.dirty_ring.producer_mutex);
 
     return true;
 }
@@ -3928,25 +3916,21 @@ bool ram_block_discard_is_required(void)
 
 bool ram_list_enqueue_dirty(unsigned long page)
 {
-    qemu_mutex_lock_ramlist_dirty_ring();
-    bool result = ram_list_enqueue_dirty_unsafe(page);
-    qemu_mutex_unlock_ramlist_dirty_ring();
-    return result;
-}
-
-bool ram_list_enqueue_dirty_unsafe(unsigned long page)
-{
     assert(ram_list.dirty_ring.buffer);
 
-    unsigned long wpos = qatomic_read(&ram_list.dirty_ring.wpos);
-    unsigned long rpos = qatomic_load_acquire(&ram_list.dirty_ring.rpos);
+    qatomic_inc(&ram_list.dirty_ring.enqueue_count);
 
-    if (unlikely(wpos - rpos == ram_list.dirty_ring.size)) {
-        return false;
-    }
+    unsigned long wpos = qatomic_load_acquire(&ram_list.dirty_ring.wpos);
+    unsigned long rpos = qatomic_load_acquire(&ram_list.dirty_ring.rpos);
+    do {
+        if (unlikely(wpos - rpos) == ram_list.dirty_ring.size) {
+            return false;
+        }
+    } while (unlikely(!qatomic_cmpxchg(&ram_list.dirty_ring.wpos, wpos, wpos + 1)));
 
     ram_list.dirty_ring.buffer[wpos & ram_list.dirty_ring.mask] = page;
-    qatomic_store_release(&ram_list.dirty_ring.wpos, wpos + 1);
+
+    qatomic_dec(&ram_list.dirty_ring.enqueue_count);
 
     return true;
 }
@@ -3955,14 +3939,17 @@ bool ram_list_dequeue_dirty(unsigned long *page)
 {
     assert(ram_list.dirty_ring.buffer);
 
-    unsigned long rpos = qatomic_read(&ram_list.dirty_ring.rpos);
-    unsigned long wpos = qatomic_load_acquire(&ram_list.dirty_ring.wpos);
+    unsigned long wpos, rpos = qatomic_load_acquire(&ram_list.dirty_ring.rpos);
+    do {
+        wpos = qatomic_load_acquire(&ram_list.dirty_ring.wpos);
+    } while (unlikely(qatomic_load_acquire(&ram_list.dirty_ring.enqueue_count) > 0));
 
     if (unlikely(rpos == wpos)) {
         return false;
     }
 
     *page = ram_list.dirty_ring.buffer[rpos & ram_list.dirty_ring.mask];
+
     qatomic_store_release(&ram_list.dirty_ring.rpos, rpos + 1);
 
     return true;
