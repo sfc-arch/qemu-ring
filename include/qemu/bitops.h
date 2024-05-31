@@ -124,7 +124,7 @@ static inline int test_and_set_bit_atomic(long nr, unsigned long *addr)
         if (old & mask) {
             return false;
         }
-    } while (!(qatomic_cmpxchg(p, old, old | mask) & mask));
+    } while (!qatomic_cmpxchg(p, old, old | mask));
 
     return true;
 }

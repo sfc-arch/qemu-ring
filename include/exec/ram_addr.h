@@ -285,9 +285,7 @@ static inline void cpu_physical_memory_set_dirty_flag(ram_addr_t addr,
     blocks = qatomic_rcu_read(&ram_list.dirty_memory[client]);
 
     if (!test_and_set_bit_atomic(offset, blocks->blocks[idx]) && migration_has_dirty_ring() && client == DIRTY_MEMORY_MIGRATION) {
-        if (unlikely(!ram_list_enqueue_dirty(page))) {
-            error_report("Failed to enqueue dirty page %lx, dirty-ring is full.", page);
-        }
+        ram_list_enqueue_dirty(page);
     }
 }
 
@@ -319,15 +317,16 @@ static inline void cpu_physical_memory_set_dirty_range(ram_addr_t start,
             unsigned long next = MIN(end, base + DIRTY_MEMORY_BLOCK_SIZE);
 
             if (likely(mask & (1 << DIRTY_MEMORY_MIGRATION))) {
-                if (!migration_has_dirty_ring()) {
+                if (!migration_has_dirty_ring() || !ram_list_enqueue_dirty_capacity()) {
+                    use_dirty_bmap:
                     bitmap_set_atomic(blocks[DIRTY_MEMORY_MIGRATION]->blocks[idx],
                                       offset, next - page);
                 } else {
                     for (unsigned long p = page; p < next; p++) {
                         if (!test_and_set_bit_atomic(p % DIRTY_MEMORY_BLOCK_SIZE,
-                                                    blocks[DIRTY_MEMORY_MIGRATION]->blocks[p / DIRTY_MEMORY_BLOCK_SIZE])) {
+                                                    blocks[DIRTY_MEMORY_MIGRATION]->blocks[idx])) {
                             if (unlikely(!ram_list_enqueue_dirty(p))) {
-                                error_report("Failed to enqueue dirty page %lx, dirty-ring is full.", p);
+                                goto use_dirty_bmap;
                             }
                         }
                     }
@@ -401,23 +400,9 @@ uint64_t cpu_physical_memory_set_dirty_lebitmap(unsigned long *bitmap,
                     qatomic_or(&blocks[DIRTY_MEMORY_VGA][idx][offset], temp);
 
                     if (global_dirty_tracking) {
-                        if (migration_has_dirty_ring()) {
-                            for (j = 0; j < BITS_PER_LONG; j++) {
-                                if ((temp & (1 << j)) == 0) {
-                                    continue;
-                                }
-
-                                if (!test_and_set_bit_atomic(j, &blocks[DIRTY_MEMORY_MIGRATION][idx][offset])) {
-                                    if (unlikely(!ram_list_enqueue_dirty(page + BITS_PER_LONG * k + j))) {
-                                        error_report("Failed to enqueue dirty page %lx, dirty-ring is full.", page + BITS_PER_LONG * k + j);
-                                    }
-                                }
-                            }
-                        } else {
-                            qatomic_or(
-                                    &blocks[DIRTY_MEMORY_MIGRATION][idx][offset],
-                                    temp);
-                        }
+                        qatomic_or(
+                                &blocks[DIRTY_MEMORY_MIGRATION][idx][offset],
+                                temp);
 
                         if (unlikely(
                             global_dirty_tracking & GLOBAL_DIRTY_DIRTY_RATE)) {
@@ -516,15 +501,13 @@ uint64_t cpu_physical_memory_sync_dirty_bitmap(RAMBlock *rb,
     uint64_t num_dirty = 0;
     unsigned long *dest = rb->bmap;
 
-    if (migration_has_dirty_ring()) {
-        unsigned long wpos = qatomic_load_acquire(&ram_list.dirty_ring.wpos);
-        unsigned long rpos = qatomic_load_acquire(&ram_list.dirty_ring.rpos);
-        for (; rpos != wpos; rpos++) {
-            unsigned long page = ram_list.dirty_ring.buffer[rpos & ram_list.dirty_ring.mask];
-            if (page >= start >> TARGET_PAGE_BITS &&
-                page < (start + length) >> TARGET_PAGE_BITS) {
-                unsigned long k = page - (start >> TARGET_PAGE_BITS);
-                if (!test_and_set_bit(k, dest)) {
+    if (migration_has_dirty_ring() && !ram_list_dequeue_dirty_full()) {
+        DirtyRing* ring = ram_list_get_dequeue_dirty();
+        for (unsigned long rpos = ring->rpos, wpos = ring->wpos; rpos != wpos; rpos++) {
+            unsigned long page = ring->buffer[rpos & ring->mask];
+            if (page >= ((start + rb->offset) >> TARGET_PAGE_BITS) &&
+                page < ((start + rb->offset + length) >> TARGET_PAGE_BITS)) {
+                if (!test_and_set_bit(page - rb->offset, dest)) {
                     num_dirty++;
                 }
             }
