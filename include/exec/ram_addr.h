@@ -507,7 +507,7 @@ uint64_t cpu_physical_memory_sync_dirty_bitmap(RAMBlock *rb,
             unsigned long page = ring->buffer[rpos & ring->mask];
             if (page >= ((start + rb->offset) >> TARGET_PAGE_BITS) &&
                 page < ((start + rb->offset + length) >> TARGET_PAGE_BITS)) {
-                if (!test_and_set_bit(page - rb->offset, dest)) {
+                if (!test_and_set_bit(page - (rb->offset >> TARGET_PAGE_BITS), dest)) {
                     num_dirty++;
                 }
             }
