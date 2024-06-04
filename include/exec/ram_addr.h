@@ -481,7 +481,7 @@ uint64_t cpu_physical_memory_set_dirty_lebitmap(unsigned long *bitmap,
 }
 
 static inline
-uint64_t cpu_physical_memory_set_dirty_ring(DirtyRing* ring)
+uint64_t cpu_physical_memory_set_dirty_ring(DirtyRing *ring)
 {
     uint64_t num_dirty = 0;
     unsigned long **blocks[DIRTY_MEMORY_NUM];
@@ -505,7 +505,7 @@ uint64_t cpu_physical_memory_set_dirty_ring(DirtyRing* ring)
                 qatomic_or(
                     &blocks[DIRTY_MEMORY_MIGRATION][idx][offset],
                     BIT_MASK(page));
-                
+
                 if (unlikely(
                     global_dirty_tracking & GLOBAL_DIRTY_DIRTY_RATE)) {
                     total_dirty_pages++;
