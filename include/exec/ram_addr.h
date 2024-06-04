@@ -27,7 +27,6 @@
 #include "exec/ramblock.h"
 #include "exec/exec-all.h"
 #include "qemu/rcu.h"
-#include "qemu/error-report.h"
 #include "migration/misc.h"
 
 extern uint64_t total_dirty_pages;
@@ -403,7 +402,6 @@ uint64_t cpu_physical_memory_set_dirty_lebitmap(unsigned long *bitmap,
                         qatomic_or(
                                 &blocks[DIRTY_MEMORY_MIGRATION][idx][offset],
                                 temp);
-
                         if (unlikely(
                             global_dirty_tracking & GLOBAL_DIRTY_DIRTY_RATE)) {
                             total_dirty_pages += nbits;
@@ -502,7 +500,7 @@ uint64_t cpu_physical_memory_sync_dirty_bitmap(RAMBlock *rb,
     unsigned long *dest = rb->bmap;
 
     if (migration_has_dirty_ring() && !ram_list_dequeue_dirty_full()) {
-        DirtyRing* ring = ram_list_get_dequeue_dirty();
+        DirtyRing *ring = ram_list_get_dequeue_dirty();
         for (unsigned long rpos = ring->rpos, wpos = ring->wpos; rpos != wpos; rpos++) {
             unsigned long page = ring->buffer[rpos & ring->mask];
             if (page >= ((start + rb->offset) >> TARGET_PAGE_BITS) &&

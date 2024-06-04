@@ -208,13 +208,13 @@ static int migration_stop_vm(MigrationState *s, RunState state)
     return ret;
 }
 
-void migration_object_init(QDict* qdict)
+void migration_object_init(QDict *qdict)
 {
     /* This can only be called once. */
     assert(!current_migration);
     current_migration = MIGRATION_OBJ(object_new(TYPE_MIGRATION));
 
-    const char* logging_method = qdict_get_try_str(qdict, "dirty-logging");
+    const char *logging_method = qdict_get_try_str(qdict, "dirty-logging");
     if (logging_method == NULL || strcmp(logging_method, "bitmap") == 0) {
         current_migration->dirty_ring_size = 0;
     } else if (strcmp(logging_method, "ring") == 0) {

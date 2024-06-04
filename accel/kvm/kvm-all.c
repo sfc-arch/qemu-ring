@@ -737,7 +737,6 @@ static uint32_t kvm_dirty_ring_reap_one(KVMState *s, CPUState *cpu)
         fetch++;
         count++;
     }
-
     cpu->kvm_fetch_index = fetch;
     cpu->dirty_pages += count;
 

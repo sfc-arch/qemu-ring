@@ -1815,7 +1815,7 @@ static bool dirty_ring_init(Error **errp)
     unsigned long dirty_ring_size = migration_get_dirty_ring_size();
 
     for (int i = 0; i < 2; i++) {
-        DirtyRing* ring = &ram_list.dirty_rings[i];
+        DirtyRing *ring = &ram_list.dirty_rings[i];
         ring->buffer = g_malloc(sizeof(ring->buffer[0]) * dirty_ring_size);
 
         if (ring->buffer == NULL) {
@@ -3925,19 +3925,19 @@ bool ram_block_discard_is_required(void)
            qatomic_read(&ram_block_coordinated_discard_required_cnt);
 }
 
-DirtyRing* ram_list_get_enqueue_dirty(void)
+DirtyRing *ram_list_get_enqueue_dirty(void)
 {
     return &ram_list.dirty_rings[ram_list.dirty_ring_switch & 1];
 }
 
-DirtyRing* ram_list_get_dequeue_dirty(void)
+DirtyRing *ram_list_get_dequeue_dirty(void)
 {
     return &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
 }
 
 bool ram_list_enqueue_dirty(unsigned long page)
 {
-    DirtyRing* ring = &ram_list.dirty_rings[ram_list.dirty_ring_switch & 1];
+    DirtyRing *ring = &ram_list.dirty_rings[ram_list.dirty_ring_switch & 1];
 
     assert(ring->buffer);
 
@@ -3953,7 +3953,7 @@ bool ram_list_enqueue_dirty(unsigned long page)
 
 bool ram_list_dequeue_dirty(unsigned long *page)
 {
-    DirtyRing* ring = &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
+    DirtyRing *ring = &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
 
     assert(ring->buffer);
 
@@ -3969,7 +3969,7 @@ bool ram_list_dequeue_dirty(unsigned long *page)
 
 unsigned long ram_list_enqueue_dirty_capacity(void)
 {
-    DirtyRing* ring = &ram_list.dirty_rings[ram_list.dirty_ring_switch & 1];
+    DirtyRing *ring = &ram_list.dirty_rings[ram_list.dirty_ring_switch & 1];
 
     return ring->size - (ring->wpos - ring->rpos);
 
@@ -3977,21 +3977,21 @@ unsigned long ram_list_enqueue_dirty_capacity(void)
 
 unsigned long ram_list_dequeue_dirty_capacity(void)
 {
-    DirtyRing* ring = &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
+    DirtyRing *ring = &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
 
     return ring->wpos - ring->rpos;
 }
 
 bool ram_list_dequeue_dirty_full(void)
 {
-    DirtyRing* ring = &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
+    DirtyRing *ring = &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
 
     return (ring->wpos - ring->rpos) == ring->size;
 }
 
 void ram_list_dequeue_dirty_reset(void)
 {
-    DirtyRing* ring = &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
+    DirtyRing *ring = &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
 
     ring->rpos = 0;
     ring->wpos = 0;

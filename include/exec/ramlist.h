@@ -116,8 +116,8 @@ void ram_block_notify_add(void *host, size_t size, size_t max_size);
 void ram_block_notify_remove(void *host, size_t size, size_t max_size);
 void ram_block_notify_resize(void *host, size_t old_size, size_t new_size);
 
-DirtyRing* ram_list_get_enqueue_dirty(void);
-DirtyRing* ram_list_get_dequeue_dirty(void);
+DirtyRing *ram_list_get_enqueue_dirty(void);
+DirtyRing *ram_list_get_dequeue_dirty(void);
 bool ram_list_enqueue_dirty(unsigned long page);
 bool ram_list_dequeue_dirty(unsigned long *page);
 unsigned long ram_list_enqueue_dirty_capacity(void);
