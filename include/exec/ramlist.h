@@ -45,7 +45,8 @@ typedef struct {
     unsigned long *blocks[];
 } DirtyMemoryBlocks;
 
-/* Ring buffer for dirty memory tracking.
+/*
+ * Ring buffer for dirty memory tracking.
  * This ring buffer does not support deletion of intermediate elements.
  * Therefore, the dirty bitmap must be checked to determine if a region has
  * been cleared.

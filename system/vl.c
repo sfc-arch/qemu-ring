@@ -3389,12 +3389,16 @@ void qemu_init(int argc, char **argv)
                                            "smp", optarg);
                 break;
             case QEMU_OPTION_migration:
-                migration_opts = qemu_opts_parse_noisily(qemu_find_opts("migration-opts"),
-                                                 optarg, false);
+                migration_opts =
+                    qemu_opts_parse_noisily(qemu_find_opts("migration-opts"),
+                                            optarg,
+                                            false);
 
                 optarg = qemu_opt_get(migration_opts, "dirty-logging");
                 if (optarg == NULL || strcmp(optarg, "bitmap") == 0) {
-                    qdict_put_str(migration_opts_dict, "dirty-logging", "bitmap");
+                    qdict_put_str(migration_opts_dict,
+                                  "dirty-logging",
+                                  "bitmap");
 
                     if (qemu_opt_find(migration_opts, "dirty-ring-size")) {
                         error_report("dirty-ring-size is only supported with dirty-logging=ring");

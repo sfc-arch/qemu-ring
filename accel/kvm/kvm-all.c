@@ -670,7 +670,8 @@ static void kvm_dirty_ring_mark_page(KVMState *s, uint32_t as_id,
     if (!test_and_set_bit(offset, mem->dirty_bmap) &&
         mem->flags & KVM_MEM_LOG_DIRTY_PAGES &&
         migration_has_dirty_ring()) {
-        unsigned long pfn = (mem->ram_start_offset >> TARGET_PAGE_BITS) + offset;
+        unsigned long pfn =
+            (mem->ram_start_offset >> TARGET_PAGE_BITS) + offset;
         ram_list_enqueue_dirty(pfn);
     }
 }

@@ -318,7 +318,8 @@ static inline void cpu_physical_memory_set_dirty_range(ram_addr_t start,
             unsigned long next = MIN(end, base + DIRTY_MEMORY_BLOCK_SIZE);
 
             if (likely(mask & (1 << DIRTY_MEMORY_MIGRATION))) {
-                if (!migration_has_dirty_ring() || !ram_list_enqueue_dirty_capacity()) {
+                if (!migration_has_dirty_ring() ||
+                    !ram_list_enqueue_dirty_capacity()) {
                     use_dirty_bmap:
                     bitmap_set_atomic(blocks[DIRTY_MEMORY_MIGRATION]->blocks[idx],
                                       offset, next - page);

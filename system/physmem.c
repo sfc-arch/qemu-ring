@@ -1807,7 +1807,7 @@ static void dirty_memory_extend(ram_addr_t old_ram_size,
 /* Called with ram_list.mutex held */
 static bool dirty_ring_init(Error **errp)
 {
-    static int initialized = 0;
+    static bool initialized;
     if (initialized) {
         return true;
     }
@@ -1831,7 +1831,7 @@ static bool dirty_ring_init(Error **errp)
 
     ram_list.dirty_ring_switch = 0;
 
-    initialized = 1;
+    initialized = true;
     return true;
 }
 
@@ -3953,7 +3953,8 @@ bool ram_list_enqueue_dirty(unsigned long page)
 
 bool ram_list_dequeue_dirty(unsigned long *page)
 {
-    DirtyRing *ring = &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
+    DirtyRing *ring =
+        &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
 
     assert(ring->buffer);
 
@@ -3977,21 +3978,24 @@ unsigned long ram_list_enqueue_dirty_capacity(void)
 
 unsigned long ram_list_dequeue_dirty_capacity(void)
 {
-    DirtyRing *ring = &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
+    DirtyRing *ring =
+        &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
 
     return ring->wpos - ring->rpos;
 }
 
 bool ram_list_dequeue_dirty_full(void)
 {
-    DirtyRing *ring = &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
+    DirtyRing *ring =
+        &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
 
     return (ring->wpos - ring->rpos) == ring->size;
 }
 
 void ram_list_dequeue_dirty_reset(void)
 {
-    DirtyRing *ring = &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
+    DirtyRing *ring =
+        &ram_list.dirty_rings[(ram_list.dirty_ring_switch + 1) & 1];
 
     ring->rpos = 0;
     ring->wpos = 0;
