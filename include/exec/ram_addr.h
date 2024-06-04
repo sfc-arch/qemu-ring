@@ -411,7 +411,8 @@ uint64_t cpu_physical_memory_set_dirty_lebitmap(unsigned long *bitmap,
                         } else {
                             for (unsigned long p = 0; p < BITS_PER_LONG; p++) {
                                 if (temp & (1ul << p)) {
-                                    unsigned long pfn = (k * BITS_PER_LONG + p) + (start >> TARGET_PAGE_BITS);
+                                    unsigned long pfn =
+                                        (k * BITS_PER_LONG + p) + (start >> TARGET_PAGE_BITS);
                                     if (!test_and_set_bit_atomic(pfn % DIRTY_MEMORY_BLOCK_SIZE,
                                                                  blocks[DIRTY_MEMORY_MIGRATION][idx])) {
                                         if (unlikely(!ram_list_enqueue_dirty(pfn))) {
@@ -421,7 +422,7 @@ uint64_t cpu_physical_memory_set_dirty_lebitmap(unsigned long *bitmap,
                                 }
                             }
                         }
-                        
+
                         if (unlikely(
                             global_dirty_tracking & GLOBAL_DIRTY_DIRTY_RATE)) {
                             total_dirty_pages += nbits;
