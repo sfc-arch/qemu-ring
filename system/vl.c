@@ -765,7 +765,7 @@ static QemuOptsList qemu_migration_opts = {
     .head = QTAILQ_HEAD_INITIALIZER(qemu_smp_opts.head),
     .desc = {
         {
-            .name = "dirty-logging", // bitmap/ring
+            .name = "dirty-logging", /* bitmap/ring */
             .type = QEMU_OPT_STRING,
         }, {
             .name = "dirty-ring-size",
@@ -3395,7 +3395,7 @@ void qemu_init(int argc, char **argv)
                 optarg = qemu_opt_get(migration_opts, "dirty-logging");
                 if (optarg == NULL || strcmp(optarg, "bitmap") == 0) {
                     qdict_put_str(migration_opts_dict, "dirty-logging", "bitmap");
-                    
+
                     if (qemu_opt_find(migration_opts, "dirty-ring-size")) {
                         error_report("dirty-ring-size is only supported with dirty-logging=ring");
                         exit(1);
@@ -3403,7 +3403,9 @@ void qemu_init(int argc, char **argv)
                 } else if (strcmp(optarg, "ring") == 0) {
                     qdict_put_str(migration_opts_dict, "dirty-logging", "ring");
 
-                    uint64_t dirty_ring_size = qemu_opt_get_size(migration_opts, "dirty-ring-size", 0);
+                    uint64_t dirty_ring_size = qemu_opt_get_size(migration_opts,
+                                                                 "dirty-ring-size",
+                                                                 0);
                     if (ctpop64(dirty_ring_size) != 1) {
                         error_report("dirty-ring-size must be a power of 2");
                         exit(1);

@@ -1807,7 +1807,7 @@ static void dirty_memory_extend(ram_addr_t old_ram_size,
 /* Called with ram_list.mutex held */
 static bool dirty_ring_init(Error **errp)
 {
-    static bool initialized = false;
+    static bool initialized = 0;
     if (initialized) {
         return true;
     }

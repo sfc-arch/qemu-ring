@@ -1640,13 +1640,15 @@ bool migrate_mode_is_cpr(MigrationState *s)
     return s->parameters.mode == MIG_MODE_CPR_REBOOT;
 }
 
-bool migration_has_dirty_ring(void) {
+bool migration_has_dirty_ring(void)
+{
     MigrationState *s = current_migration;
 
     return s->dirty_ring_size != 0;
 }
 
-unsigned long migration_get_dirty_ring_size(void) {
+unsigned long migration_get_dirty_ring_size(void)
+{
     MigrationState *s = current_migration;
 
     return s->dirty_ring_size;

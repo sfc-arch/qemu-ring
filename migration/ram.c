@@ -2283,7 +2283,9 @@ static int ram_find_and_save_block(RAMState *rs)
 
     pss_init(pss, rs->last_seen_block, rs->last_page);
 
-    if (rs->first_bitmap_scanning || !migration_has_dirty_ring() || ram_list_dequeue_dirty_full()) {
+    if (rs->first_bitmap_scanning ||
+        !migration_has_dirty_ring() ||
+        ram_list_dequeue_dirty_full()) {
         while (true) {
             if (!get_queued_page(rs, pss)) {
                 /* priority queue empty, so just search for something dirty */

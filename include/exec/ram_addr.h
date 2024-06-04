@@ -283,7 +283,9 @@ static inline void cpu_physical_memory_set_dirty_flag(ram_addr_t addr,
 
     blocks = qatomic_rcu_read(&ram_list.dirty_memory[client]);
 
-    if (!test_and_set_bit_atomic(offset, blocks->blocks[idx]) && migration_has_dirty_ring() && client == DIRTY_MEMORY_MIGRATION) {
+    if (!test_and_set_bit_atomic(offset, blocks->blocks[idx]) &&
+        migration_has_dirty_ring() &&
+        client == DIRTY_MEMORY_MIGRATION) {
         ram_list_enqueue_dirty(page);
     }
 }
