@@ -218,7 +218,8 @@ void migration_object_init(QDict *qdict)
     if (logging_method == NULL || strcmp(logging_method, "bitmap") == 0) {
         current_migration->dirty_ring_size = 0;
     } else if (strcmp(logging_method, "ring") == 0) {
-        current_migration->dirty_ring_size = qdict_get_int(qdict, "dirty-ring-size");
+        current_migration->dirty_ring_size = qdict_get_int(qdict,
+                                                           "dirty-ring-size");
     }
 
     /*

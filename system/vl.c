@@ -3414,7 +3414,9 @@ void qemu_init(int argc, char **argv)
                         exit(1);
                     }
 
-                    qdict_put_int(migration_opts_dict, "dirty-ring-size", dirty_ring_size);
+                    qdict_put_int(migration_opts_dict,
+                                  "dirty-ring-size",
+                                  dirty_ring_size);
                 } else {
                     error_report("invalid dirty-logging option: %s", optarg);
                     exit(1);

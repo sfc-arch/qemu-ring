@@ -503,11 +503,14 @@ uint64_t cpu_physical_memory_sync_dirty_bitmap(RAMBlock *rb,
 
     if (migration_has_dirty_ring() && !ram_list_dequeue_dirty_full()) {
         DirtyRing *ring = ram_list_get_dequeue_dirty();
-        for (unsigned long rpos = ring->rpos, wpos = ring->wpos; rpos != wpos; rpos++) {
+        for (unsigned long rpos = ring->rpos, wpos = ring->wpos;
+             rpos != wpos;
+             rpos++) {
             unsigned long page = ring->buffer[rpos & ring->mask];
             if (page >= ((start + rb->offset) >> TARGET_PAGE_BITS) &&
                 page < ((start + rb->offset + length) >> TARGET_PAGE_BITS)) {
-                if (!test_and_set_bit(page - (rb->offset >> TARGET_PAGE_BITS), dest)) {
+                if (!test_and_set_bit(page - (rb->offset >> TARGET_PAGE_BITS),
+                                dest)) {
                     num_dirty++;
                 }
             }

@@ -1060,7 +1060,8 @@ static void migration_bitmap_sync(RAMState *rs, bool last_stage)
             unsigned long page;
             while (ram_list_dequeue_dirty(&page)) {
                 block = qemu_get_ram_block(page << TARGET_PAGE_BITS);
-                if (test_bit(page - (block->offset >> TARGET_PAGE_BITS), block->bmap)) {
+                if (test_bit(page - (block->offset >> TARGET_PAGE_BITS),
+                             block->bmap)) {
                     ram_list_enqueue_dirty(page);
                 }
             }

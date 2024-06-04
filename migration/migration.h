@@ -458,7 +458,10 @@ struct MigrationState {
     /* Is this a rdma migration */
     bool rdma_migration;
 
-    /* The number of elements in the dirty-ring. It is 0 if the dirty-ring is not enabled. */
+    /*
+     * The number of elements in the dirty-ring.
+     * It is 0 if the dirty-ring is not enabled.
+     */
     unsigned long dirty_ring_size;
 };
 
