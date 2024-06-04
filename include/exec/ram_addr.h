@@ -319,7 +319,7 @@ static inline void cpu_physical_memory_set_dirty_range(ram_addr_t start,
 
             if (likely(mask & (1 << DIRTY_MEMORY_MIGRATION))) {
                 if (!migration_has_dirty_ring() ||
-                    !ram_list_enqueue_dirty_capacity()) {
+                    ram_list_enqueue_dirty_full()) {
                     use_dirty_bmap:
                     bitmap_set_atomic(blocks[DIRTY_MEMORY_MIGRATION]->blocks[idx],
                                       offset, next - page);
@@ -402,9 +402,26 @@ uint64_t cpu_physical_memory_set_dirty_lebitmap(unsigned long *bitmap,
                     qatomic_or(&blocks[DIRTY_MEMORY_VGA][idx][offset], temp);
 
                     if (global_dirty_tracking) {
-                        qatomic_or(
-                                &blocks[DIRTY_MEMORY_MIGRATION][idx][offset],
-                                temp);
+                        if (!migration_has_dirty_ring() ||
+                            ram_list_enqueue_dirty_full()) {
+                            use_dirty_bmap:
+                            qatomic_or(
+                                    &blocks[DIRTY_MEMORY_MIGRATION][idx][offset],
+                                    temp);
+                        } else {
+                            for (unsigned long p = 0; p < BITS_PER_LONG; p++) {
+                                if (temp & (1ul << p)) {
+                                    unsigned long pfn = (k * BITS_PER_LONG + p) + (start >> TARGET_PAGE_BITS);
+                                    if (!test_and_set_bit_atomic(pfn % DIRTY_MEMORY_BLOCK_SIZE,
+                                                                 blocks[DIRTY_MEMORY_MIGRATION][idx])) {
+                                        if (unlikely(!ram_list_enqueue_dirty(pfn))) {
+                                            goto use_dirty_bmap;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
                         if (unlikely(
                             global_dirty_tracking & GLOBAL_DIRTY_DIRTY_RATE)) {
                             total_dirty_pages += nbits;
@@ -461,6 +478,53 @@ uint64_t cpu_physical_memory_set_dirty_lebitmap(unsigned long *bitmap,
 
     return num_dirty;
 }
+
+static inline
+uint64_t cpu_physical_memory_set_dirty_ring(DirtyRing* ring)
+{
+    uint64_t num_dirty = 0;
+    unsigned long **blocks[DIRTY_MEMORY_NUM];
+
+    WITH_RCU_READ_LOCK_GUARD() {
+        for (int i = 0; i < DIRTY_MEMORY_NUM; i++) {
+            blocks[i] =
+                qatomic_rcu_read(&ram_list.dirty_memory[i])->blocks;
+        }
+
+        for (unsigned long rpos = ring->rpos, wpos = ring->wpos;
+             rpos != wpos;
+             rpos++) {
+            unsigned long page = ring->buffer[rpos & ring->mask];
+            unsigned long idx = page / DIRTY_MEMORY_BLOCK_SIZE;
+            unsigned long offset = BIT_WORD(page % DIRTY_MEMORY_BLOCK_SIZE);
+
+            qatomic_or(&blocks[DIRTY_MEMORY_VGA][idx][offset], BIT_MASK(page));
+
+            if (global_dirty_tracking) {
+                qatomic_or(
+                    &blocks[DIRTY_MEMORY_MIGRATION][idx][offset],
+                    BIT_MASK(page));
+                
+                if (unlikely(
+                    global_dirty_tracking & GLOBAL_DIRTY_DIRTY_RATE)) {
+                    total_dirty_pages++;
+                }
+            }
+
+            if (tcg_enabled()) {
+                qatomic_or(&blocks[DIRTY_MEMORY_CODE][idx][offset],
+                           BIT_MASK(page));
+            }
+
+            num_dirty++;
+
+            xen_hvm_modified_memory(page << TARGET_PAGE_BITS,
+                                    TARGET_PAGE_SIZE);
+        }
+    }
+
+    return num_dirty;
+}
 #endif /* not _WIN32 */
 
 static inline void cpu_physical_memory_dirty_bits_cleared(ram_addr_t start,
@@ -491,7 +555,7 @@ static inline void cpu_physical_memory_clear_dirty_range(ram_addr_t start,
 }
 
 
-/* Called with RCU critical section and ram_list.mutex held */
+/* Called with RCU critical section held */
 static inline
 uint64_t cpu_physical_memory_sync_dirty_bitmap(RAMBlock *rb,
                                                ram_addr_t start,

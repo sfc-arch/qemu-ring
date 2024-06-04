@@ -3984,6 +3984,13 @@ unsigned long ram_list_dequeue_dirty_capacity(void)
     return ring->wpos - ring->rpos;
 }
 
+bool ram_list_enqueue_dirty_full(void)
+{
+    DirtyRing *ring = &ram_list.dirty_rings[ram_list.dirty_ring_switch & 1];
+
+    return (ring->wpos - ring->rpos) == ring->size;
+}
+
 bool ram_list_dequeue_dirty_full(void)
 {
     DirtyRing *ring =

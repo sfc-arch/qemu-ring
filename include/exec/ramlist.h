@@ -123,6 +123,7 @@ bool ram_list_enqueue_dirty(unsigned long page);
 bool ram_list_dequeue_dirty(unsigned long *page);
 unsigned long ram_list_enqueue_dirty_capacity(void);
 unsigned long ram_list_dequeue_dirty_capacity(void);
+bool ram_list_enqueue_dirty_full(void);
 bool ram_list_dequeue_dirty_full(void);
 void ram_list_dequeue_dirty_reset(void);
 void ram_list_dirty_ring_switch(void);
