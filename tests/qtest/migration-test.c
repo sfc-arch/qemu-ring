@@ -577,7 +577,8 @@ typedef struct {
     /* only launch the target process */
     bool only_target;
     /* Use dirty ring if true; dirty logging otherwise */
-    bool use_dirty_ring;
+    bool use_kvm_dirty_ring;
+    bool use_qemu_dirty_ring;
     const char *opts_source;
     const char *opts_target;
     /* suspend the src before migrating to dest. */
@@ -696,6 +697,7 @@ static int test_migrate_start(QTestState **from, QTestState **to,
     g_autofree char *shmem_opts = NULL;
     g_autofree char *shmem_path = NULL;
     const char *kvm_opts = NULL;
+    const char *migration_ops = NULL;
     const char *arch = qtest_get_arch();
     const char *memory_size;
     const char *machine_alias, *machine_opts = "";
@@ -777,8 +779,14 @@ static int test_migrate_start(QTestState **from, QTestState **to,
             memory_size, shmem_path);
     }
 
-    if (args->use_dirty_ring) {
+    if (args->use_kvm_dirty_ring) {
         kvm_opts = ",dirty-ring-size=4096";
+    }
+
+    if (args->use_qemu_dirty_ring) {
+        migration_ops = "dirty-logging=ring,dirty-ring-size=4096";
+    } else {
+        migration_ops = "dirty-logging=bitmap";
     }
 
     machine = resolve_machine_version(machine_alias, QEMU_ENV_SRC,
@@ -791,10 +799,12 @@ static int test_migrate_start(QTestState **from, QTestState **to,
                                  "-name source,debug-threads=on "
                                  "-m %s "
                                  "-serial file:%s/src_serial "
+                                 "-migration %s "
                                  "%s %s %s %s %s",
                                  kvm_opts ? kvm_opts : "",
                                  machine, machine_opts,
                                  memory_size, tmpfs,
+                                 migration_ops,
                                  arch_opts ? arch_opts : "",
                                  arch_source ? arch_source : "",
                                  shmem_opts ? shmem_opts : "",
@@ -1813,12 +1823,27 @@ static void test_precopy_unix_suspend_notlive(void)
     test_precopy_common(&args);
 }
 
-static void test_precopy_unix_dirty_ring(void)
+static void test_precopy_unix_qemu_dirty_ring(void)
 {
     g_autofree char *uri = g_strdup_printf("unix:%s/migsocket", tmpfs);
     MigrateCommon args = {
         .start = {
-            .use_dirty_ring = true,
+            .use_qemu_dirty_ring = true,
+        },
+        .listen_uri = uri,
+        .connect_uri = uri,
+        .live = true,
+    };
+
+    test_precopy_common(&args);
+}
+
+static void test_precopy_unix_kvm_dirty_ring(void)
+{
+    g_autofree char *uri = g_strdup_printf("unix:%s/migsocket", tmpfs);
+    MigrateCommon args = {
+        .start = {
+            .use_kvm_dirty_ring = true,
         },
         .listen_uri = uri,
         .connect_uri = uri,
@@ -1831,6 +1856,22 @@ static void test_precopy_unix_dirty_ring(void)
 
     test_precopy_common(&args);
 }
+
+// static void test_precopy_unix_kvm_and_qemu_dirty_ring(void)
+// {
+//     g_autofree char *uri = g_strdup_printf("unix:%s/migsocket", tmpfs);
+//     MigrateCommon args = {
+//         .start = {
+//             .use_kvm_dirty_ring = true,
+//             .use_qemu_dirty_ring = true,
+//         },
+//         .listen_uri = uri,
+//         .connect_uri = uri,
+//         .live = true,
+//     };
+
+//     test_precopy_common(&args);
+// }
 
 #ifdef CONFIG_GNUTLS
 static void test_precopy_unix_tls_psk(void)
@@ -1952,6 +1993,21 @@ static void test_precopy_file(void)
     g_autofree char *uri = g_strdup_printf("file:%s/%s", tmpfs,
                                            FILE_TEST_FILENAME);
     MigrateCommon args = {
+        .connect_uri = uri,
+        .listen_uri = "defer",
+    };
+
+    test_file_common(&args, true);
+}
+
+static void test_precopy_file_dirty_ring(void)
+{
+    g_autofree char *uri = g_strdup_printf("file:%s/%s", tmpfs,
+                                           FILE_TEST_FILENAME);
+    MigrateCommon args = {
+        .start = {
+            .use_qemu_dirty_ring = true,
+        },
         .connect_uri = uri,
         .listen_uri = "defer",
     };
@@ -3276,7 +3332,7 @@ static void test_migrate_dirty_limit(void)
     MigrateCommon args = {
         .start = {
             .hide_stderr = true,
-            .use_dirty_ring = true,
+            .use_kvm_dirty_ring = true,
         },
         .listen_uri = uri,
         .connect_uri = uri,
@@ -3320,7 +3376,7 @@ static void test_migrate_dirty_limit(void)
     args = (MigrateCommon) {
         .start = {
             .only_target = true,
-            .use_dirty_ring = true,
+            .use_kvm_dirty_ring = true,
         },
         .listen_uri = uri,
         .connect_uri = uri,
@@ -3493,10 +3549,14 @@ int main(int argc, char **argv)
 #endif
     migration_test_add("/migration/precopy/unix/plain",
                        test_precopy_unix_plain);
+    migration_test_add("/migration/precopy/unix/dirty_ring",
+                       test_precopy_unix_qemu_dirty_ring);
     migration_test_add("/migration/precopy/unix/xbzrle",
                        test_precopy_unix_xbzrle);
     migration_test_add("/migration/precopy/file",
                        test_precopy_file);
+    migration_test_add("/migration/precopy/file/dirty_ring",
+                       test_precopy_file_dirty_ring);
     migration_test_add("/migration/precopy/file/offset",
                        test_precopy_file_offset);
     migration_test_add("/migration/precopy/file/offset/bad",
@@ -3641,8 +3701,10 @@ int main(int argc, char **argv)
 #endif /* CONFIG_GNUTLS */
 
     if (g_str_equal(arch, "x86_64") && has_kvm && kvm_dirty_ring_supported()) {
-        migration_test_add("/migration/dirty_ring",
-                           test_precopy_unix_dirty_ring);
+        migration_test_add("/migration/precopy/unix/kvm_dirty_ring",
+                           test_precopy_unix_kvm_dirty_ring);
+        // migration_test_add("/migration/precopy/unix/kvm_and_qemu_dirty_ring",
+        //                    test_precopy_unix_kvm_and_qemu_dirty_ring);
         migration_test_add("/migration/vcpu_dirty_limit",
                            test_vcpu_dirty_limit);
     }
