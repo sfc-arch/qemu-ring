@@ -1857,21 +1857,21 @@ static void test_precopy_unix_kvm_dirty_ring(void)
     test_precopy_common(&args);
 }
 
-// static void test_precopy_unix_kvm_and_qemu_dirty_ring(void)
-// {
-//     g_autofree char *uri = g_strdup_printf("unix:%s/migsocket", tmpfs);
-//     MigrateCommon args = {
-//         .start = {
-//             .use_kvm_dirty_ring = true,
-//             .use_qemu_dirty_ring = true,
-//         },
-//         .listen_uri = uri,
-//         .connect_uri = uri,
-//         .live = true,
-//     };
+static void test_precopy_unix_kvm_and_qemu_dirty_ring(void)
+{
+    g_autofree char *uri = g_strdup_printf("unix:%s/migsocket", tmpfs);
+    MigrateCommon args = {
+        .start = {
+            .use_kvm_dirty_ring = true,
+            .use_qemu_dirty_ring = true,
+        },
+        .listen_uri = uri,
+        .connect_uri = uri,
+        .live = true,
+    };
 
-//     test_precopy_common(&args);
-// }
+    test_precopy_common(&args);
+}
 
 #ifdef CONFIG_GNUTLS
 static void test_precopy_unix_tls_psk(void)
@@ -3703,8 +3703,8 @@ int main(int argc, char **argv)
     if (g_str_equal(arch, "x86_64") && has_kvm && kvm_dirty_ring_supported()) {
         migration_test_add("/migration/precopy/unix/kvm_dirty_ring",
                            test_precopy_unix_kvm_dirty_ring);
-        // migration_test_add("/migration/precopy/unix/kvm_and_qemu_dirty_ring",
-        //                    test_precopy_unix_kvm_and_qemu_dirty_ring);
+        migration_test_add("/migration/precopy/unix/kvm_and_qemu_dirty_ring",
+                           test_precopy_unix_kvm_and_qemu_dirty_ring);
         migration_test_add("/migration/vcpu_dirty_limit",
                            test_vcpu_dirty_limit);
     }
