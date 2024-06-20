@@ -776,6 +776,7 @@ static int test_migrate_start(QTestState **from, QTestState **to,
                                       QEMU_ENV_DST);
 
     g_test_message("Using machine type: %s", machine);
+
     cmd_source = g_strdup_printf("-accel kvm%s -accel tcg "
                                  "-machine %s,%s "
                                  "-name source,debug-threads=on "

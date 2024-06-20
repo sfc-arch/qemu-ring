@@ -3401,7 +3401,8 @@ void qemu_init(int argc, char **argv)
                                   "bitmap");
 
                     if (qemu_opt_find(migration_opts, "dirty-ring-size")) {
-                        error_report("dirty-ring-size is only supported with dirty-logging=ring");
+                        error_report("dirty-ring-size is only supported "
+                                     "with dirty-logging=ring");
                         exit(1);
                     }
                 } else if (strcmp(optarg, "ring") == 0) {

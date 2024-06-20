@@ -409,8 +409,8 @@ uint64_t cpu_physical_memory_set_dirty_lebitmap(unsigned long *bitmap,
                             ram_list_enqueue_dirty_full()) {
                             use_dirty_bmap:
                             qatomic_or(
-                                    &blocks[DIRTY_MEMORY_MIGRATION][idx][offset],
-                                    temp);
+                                &blocks[DIRTY_MEMORY_MIGRATION][idx][offset],
+                                temp);
                         } else {
                             for (unsigned long p = 0; p < BITS_PER_LONG; p++) {
                                 if (temp & (1ul << p)) {
