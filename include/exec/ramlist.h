@@ -68,7 +68,7 @@ typedef struct {
     /*
      * The current read position in the dirty-ring.
      * If dirty_ring_rpos == dirty_ring_wpos, the dirty-ring is empty.
-     * If dirty_ring_wpos - dirty_ring_rpos == dirty_ring_size,the dirty-ring
+     * If dirty_ring_wpos - dirty_ring_rpos == dirty_ring_size, the dirty-ring
      * is full.
      */
     unsigned long rpos;

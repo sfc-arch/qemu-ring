@@ -326,7 +326,7 @@ static inline void cpu_physical_memory_set_dirty_range(ram_addr_t start,
                 } else {
                     for (unsigned long p = page; p < next; p++) {
                         if (!test_and_set_bit_atomic(p % DIRTY_MEMORY_BLOCK_SIZE,
-                                                    blocks[DIRTY_MEMORY_MIGRATION]->blocks[idx])) {
+                                                     blocks[DIRTY_MEMORY_MIGRATION]->blocks[idx])) {
                             if (unlikely(!ram_list_enqueue_dirty(p))) {
                                 goto use_dirty_bmap;
                             }
@@ -579,7 +579,7 @@ uint64_t cpu_physical_memory_sync_dirty_bitmap(RAMBlock *rb,
             if (page >= ((start + rb->offset) >> TARGET_PAGE_BITS) &&
                 page < ((start + rb->offset + length) >> TARGET_PAGE_BITS)) {
                 if (!test_and_set_bit(page - (rb->offset >> TARGET_PAGE_BITS),
-                                dest)) {
+                                      dest)) {
                     num_dirty++;
                 }
 
