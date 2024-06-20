@@ -67,6 +67,7 @@ config LOONGSON3V
     imply USB_OHCI_PCI
     select SERIAL
     select GOLDFISH_RTC
+    select LOONGSON_IPI
     select LOONGSON_LIOINTC
     select PCI_EXPRESS_GENERIC_BRIDGE
     select MSI_NONBROKEN
@@ -80,9 +81,10 @@ config MIPS_CPS
 config MIPS_BOSTON
     bool
     default y
-    depends on MIPS64 && !TARGET_BIG_ENDIAN
+    depends on MIPS64 && !TARGET_BIG_ENDIAN && FDT
     imply PCI_DEVICES
     imply TEST_DEVICES
+    select DEVICE_TREE
     select FITLOADER
     select MIPS_CPS
     select PCI_EXPRESS_XILINX

@@ -29,7 +29,7 @@ system_ss.add(files(
   'socket.c',
   'tls.c',
   'threadinfo.c',
-), gnutls)
+), gnutls, zlib)
 
 if get_option('replication').allowed()
   system_ss.add(files('colo-failover.c', 'colo.c'))
@@ -39,6 +39,8 @@ endif
 
 system_ss.add(when: rdma, if_true: files('rdma.c'))
 system_ss.add(when: zstd, if_true: files('multifd-zstd.c'))
+system_ss.add(when: qpl, if_true: files('multifd-qpl.c'))
+system_ss.add(when: uadk, if_true: files('multifd-uadk.c'))
 
 specific_ss.add(when: 'CONFIG_SYSTEM_ONLY',
                 if_true: files('ram.c',

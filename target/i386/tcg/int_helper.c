@@ -145,27 +145,24 @@ void helper_idivl_EAX(CPUX86State *env, target_ulong t0)
 
 /* bcd */
 
-/* XXX: exception */
-void helper_aam(CPUX86State *env, int base)
+target_ulong helper_aam(target_ulong al, target_ulong base)
 {
-    int al, ah;
+    int ah;
 
-    al = env->regs[R_EAX] & 0xff;
+    al &= 0xff;
     ah = al / base;
     al = al % base;
-    env->regs[R_EAX] = (env->regs[R_EAX] & ~0xffff) | al | (ah << 8);
-    CC_DST = al;
+    return al | (ah << 8);
 }
 
-void helper_aad(CPUX86State *env, int base)
+target_ulong helper_aad(target_ulong ax, target_ulong base)
 {
     int al, ah;
 
-    al = env->regs[R_EAX] & 0xff;
-    ah = (env->regs[R_EAX] >> 8) & 0xff;
+    al = ax & 0xff;
+    ah = (ax >> 8) & 0xff;
     al = ((ah * base) + al) & 0xff;
-    env->regs[R_EAX] = (env->regs[R_EAX] & ~0xffff) | al;
-    CC_DST = al;
+    return al;
 }
 
 void helper_aaa(CPUX86State *env)
@@ -190,6 +187,7 @@ void helper_aaa(CPUX86State *env)
     }
     env->regs[R_EAX] = (env->regs[R_EAX] & ~0xffff) | al | (ah << 8);
     CC_SRC = eflags;
+    CC_OP = CC_OP_EFLAGS;
 }
 
 void helper_aas(CPUX86State *env)
@@ -214,6 +212,7 @@ void helper_aas(CPUX86State *env)
     }
     env->regs[R_EAX] = (env->regs[R_EAX] & ~0xffff) | al | (ah << 8);
     CC_SRC = eflags;
+    CC_OP = CC_OP_EFLAGS;
 }
 
 void helper_daa(CPUX86State *env)
@@ -241,6 +240,7 @@ void helper_daa(CPUX86State *env)
     eflags |= parity_table[al]; /* pf */
     eflags |= (al & 0x80); /* sf */
     CC_SRC = eflags;
+    CC_OP = CC_OP_EFLAGS;
 }
 
 void helper_das(CPUX86State *env)
@@ -272,6 +272,7 @@ void helper_das(CPUX86State *env)
     eflags |= parity_table[al]; /* pf */
     eflags |= (al & 0x80); /* sf */
     CC_SRC = eflags;
+    CC_OP = CC_OP_EFLAGS;
 }
 
 #ifdef TARGET_X86_64
@@ -452,10 +453,11 @@ target_ulong HELPER(rdrand)(CPUX86State *env)
         error_free(err);
         /* Failure clears CF and all other flags, and returns 0.  */
         env->cc_src = 0;
-        return 0;
+        ret = 0;
+    } else {
+        /* Success sets CF and clears all others.  */
+        env->cc_src = CC_C;
     }
-
-    /* Success sets CF and clears all others.  */
-    env->cc_src = CC_C;
+    env->cc_op = CC_OP_EFLAGS;
     return ret;
 }
