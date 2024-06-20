@@ -1042,6 +1042,27 @@ static void migration_trigger_throttle(RAMState *rs)
     }
 }
 
+static uint64_t migration_sync_dirty_ring(RAMBlock *block)
+{
+    uint64_t dirty_page_count = 0;
+
+    uint64_t nr = BITS_TO_LONGS(block->used_length >> TARGET_PAGE_BITS);
+    for (uint64_t i = 0; i < nr; i++) {
+        if (block->bmap[i]) {
+            uint64_t page = i * BITS_PER_LONG;
+            uint64_t end = MIN(page + BITS_PER_LONG, block->used_length >> TARGET_PAGE_BITS);
+            for (; page < end; page++) {
+                if (test_bit(page, block->bmap)) {
+                    ram_list_enqueue_dirty(page + (block->offset >> TARGET_PAGE_BITS));
+                    dirty_page_count++;
+                }
+            }
+        }
+    }
+
+    return dirty_page_count;
+}
+
 static void migration_bitmap_sync(RAMState *rs, bool last_stage)
 {
     RAMBlock *block;
@@ -1056,6 +1077,23 @@ static void migration_bitmap_sync(RAMState *rs, bool last_stage)
     if (migration_has_dirty_ring()) {
         if (unlikely(ram_list_dequeue_dirty_full())) {
             ram_list_dequeue_dirty_reset();
+
+            if (ram_list_enqueue_dirty_capacity() >= rs->migration_dirty_pages) {
+                uint64_t dirty_page_count = 0;
+                WITH_QEMU_LOCK_GUARD(&rs->bitmap_mutex) {
+                    WITH_RCU_READ_LOCK_GUARD() {
+                        RAMBLOCK_FOREACH_NOT_IGNORED(block) {
+                            dirty_page_count += migration_sync_dirty_ring(block);
+                            if (dirty_page_count >= rs->migration_dirty_pages) {
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else {
+                DirtyRing *ring = ram_list_get_enqueue_dirty();
+                ring->wpos = ring->rpos + ring->size;
+            }
         } else {
             unsigned long page;
             while (ram_list_dequeue_dirty(&page)) {

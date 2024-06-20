@@ -118,13 +118,15 @@ static inline int test_and_set_bit_atomic(long nr, unsigned long *addr)
     unsigned long mask = BIT_MASK(nr);
     unsigned long *p = addr + BIT_WORD(nr);
     unsigned long old;
+    unsigned long desired;
 
     do {
         old = qatomic_read(p);
         if (old & mask) {
             return false;
         }
-    } while (!qatomic_cmpxchg(p, old, old | mask));
+        desired = old | mask;
+    } while (qatomic_cmpxchg(p, old, desired) != desired);
 
     return true;
 }

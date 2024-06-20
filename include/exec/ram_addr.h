@@ -568,6 +568,9 @@ uint64_t cpu_physical_memory_sync_dirty_bitmap(RAMBlock *rb,
     unsigned long *dest = rb->bmap;
 
     if (migration_has_dirty_ring() && !ram_list_dequeue_dirty_full()) {
+        unsigned long *const *src = qatomic_rcu_read(
+                &ram_list.dirty_memory[DIRTY_MEMORY_MIGRATION])->blocks;
+
         DirtyRing *ring = ram_list_get_dequeue_dirty();
         for (unsigned long rpos = ring->rpos, wpos = ring->wpos;
              rpos != wpos;
@@ -579,6 +582,10 @@ uint64_t cpu_physical_memory_sync_dirty_bitmap(RAMBlock *rb,
                                 dest)) {
                     num_dirty++;
                 }
+
+                unsigned long idx = page / DIRTY_MEMORY_BLOCK_SIZE;
+                unsigned long offset = BIT_WORD(page % DIRTY_MEMORY_BLOCK_SIZE);
+                src[idx][offset] &= ~BIT_MASK(page);
             }
         }
 
