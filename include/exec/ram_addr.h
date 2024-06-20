@@ -321,12 +321,15 @@ static inline void cpu_physical_memory_set_dirty_range(ram_addr_t start,
                 if (!migration_has_dirty_ring() ||
                     ram_list_enqueue_dirty_full()) {
                     use_dirty_bmap:
-                    bitmap_set_atomic(blocks[DIRTY_MEMORY_MIGRATION]->blocks[idx],
-                                      offset, next - page);
+                    bitmap_set_atomic(
+                        blocks[DIRTY_MEMORY_MIGRATION]->blocks[idx],
+                        offset,
+                        next - page);
                 } else {
                     for (unsigned long p = page; p < next; p++) {
-                        if (!test_and_set_bit_atomic(p % DIRTY_MEMORY_BLOCK_SIZE,
-                                                     blocks[DIRTY_MEMORY_MIGRATION]->blocks[idx])) {
+                        if (!test_and_set_bit_atomic(
+                                p % DIRTY_MEMORY_BLOCK_SIZE,
+                                blocks[DIRTY_MEMORY_MIGRATION]->blocks[idx])) {
                             if (unlikely(!ram_list_enqueue_dirty(p))) {
                                 goto use_dirty_bmap;
                             }
@@ -412,9 +415,11 @@ uint64_t cpu_physical_memory_set_dirty_lebitmap(unsigned long *bitmap,
                             for (unsigned long p = 0; p < BITS_PER_LONG; p++) {
                                 if (temp & (1ul << p)) {
                                     unsigned long pfn =
-                                        (k * BITS_PER_LONG + p) + (start >> TARGET_PAGE_BITS);
-                                    if (!test_and_set_bit_atomic(pfn % DIRTY_MEMORY_BLOCK_SIZE,
-                                                                 blocks[DIRTY_MEMORY_MIGRATION][idx])) {
+                                        (k * BITS_PER_LONG + p) +
+                                        (start >> TARGET_PAGE_BITS);
+                                    if (!test_and_set_bit_atomic(
+                                            pfn % DIRTY_MEMORY_BLOCK_SIZE,
+                                            blocks[DIRTY_MEMORY_MIGRATION][idx])) {
                                         if (unlikely(!ram_list_enqueue_dirty(pfn))) {
                                             goto use_dirty_bmap;
                                         }
