@@ -463,6 +463,9 @@ struct MigrationState {
      * It is 0 if the dirty-ring is not enabled.
      */
     unsigned long dirty_ring_size;
+
+    uint64_t ring_used;
+    uint64_t bitmap_used;
 };
 
 void migrate_set_state(int *state, int old_state, int new_state);

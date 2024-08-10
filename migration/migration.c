@@ -1168,6 +1168,9 @@ static void populate_ram_info(MigrationInfo *info, MigrationState *s)
     info->ram->downtime_bytes = stat64_get(&mig_stats.downtime_bytes);
     info->ram->postcopy_bytes = stat64_get(&mig_stats.postcopy_bytes);
 
+    info->ring_used = s->ring_used;
+    info->bitmap_used = s->bitmap_used;
+
     if (migrate_xbzrle()) {
         info->xbzrle_cache = g_malloc0(sizeof(*info->xbzrle_cache));
         info->xbzrle_cache->cache_size = migrate_xbzrle_cache_size();
@@ -1692,6 +1695,10 @@ int migrate_init(MigrationState *s, Error **errp)
     s->threshold_size = 0;
     s->switchover_acked = false;
     s->rdma_migration = false;
+
+    s->ring_used = 0;
+    s->bitmap_used = 0;
+
     /*
      * set mig_stats memory to zero for a new migration
      */

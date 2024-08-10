@@ -143,6 +143,11 @@ void hmp_info_migrate(Monitor *mon, const QDict *qdict)
                            "Zero-copy-send fallbacks happened: %" PRIu64 " times\n",
                            info->ram->dirty_sync_missed_zero_copy);
         }
+
+        monitor_printf(mon, "ring used: %" PRIu64 "\n",
+                       info->ring_used);
+        monitor_printf(mon, "bitmap used: %" PRIu64 "\n",
+                       info->bitmap_used);
     }
 
     if (info->xbzrle_cache) {

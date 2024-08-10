@@ -1069,6 +1069,7 @@ static void migration_bitmap_sync(RAMState *rs, bool last_stage)
 {
     RAMBlock *block;
     int64_t end_time;
+    MigrationState *s= migrate_get_current();
 
     stat64_add(&mig_stats.dirty_sync_count, 1);
 
@@ -1116,6 +1117,14 @@ static void migration_bitmap_sync(RAMState *rs, bool last_stage)
 
     if (migration_has_dirty_ring()) {
         ram_list_dirty_ring_switch();
+    }
+
+    if (rs->first_bitmap_scanning ||
+        !migration_has_dirty_ring() ||
+        ram_list_dequeue_dirty_full()) {
+        s->bitmap_used++;
+    } else {
+        s->ring_used++;
     }
 
     WITH_QEMU_LOCK_GUARD(&rs->bitmap_mutex) {

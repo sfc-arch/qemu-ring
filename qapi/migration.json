@@ -253,6 +253,11 @@
 #     average memory load of the virtual CPU indirectly.  Note that
 #     zero means guest doesn't dirty memory.  (Since 8.1)
 #
+# @bitmap-used: hoge
+#
+# @ring-used: fuga
+#
+
 # Since: 0.14
 ##
 { 'struct': 'MigrationInfo',
@@ -270,7 +275,9 @@
            '*postcopy-vcpu-blocktime': ['uint32'],
            '*socket-address': ['SocketAddress'],
            '*dirty-limit-throttle-time-per-round': 'uint64',
-           '*dirty-limit-ring-full-time': 'uint64'} }
+           '*dirty-limit-ring-full-time': 'uint64',
+           '*bitmap-used': 'uint64',
+           '*ring-used': 'uint64'} }
 
 ##
 # @query-migrate:
