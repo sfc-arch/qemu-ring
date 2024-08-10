@@ -2342,7 +2342,9 @@ static int ram_find_and_save_block(RAMState *rs)
         while (true) {
             if (!get_queued_page(rs, pss)) {
                 /* priority queue empty, so just search for something dirty */
+                trace_find_dirty_bitmap_start();
                 int res = find_dirty_block(rs, pss);
+                trace_find_dirty_bitmap_end();
                 if (pss->complete_round) {
                     rs->first_bitmap_scanning = false;
                 }
@@ -2372,10 +2374,16 @@ static int ram_find_and_save_block(RAMState *rs)
 
         if (!pages) {
             unsigned long page;
-            while (ram_list_dequeue_dirty(&page)) {
+            while (true) {
+                trace_find_dirty_ring_start();
+                if (!ram_list_dequeue_dirty(&page)) {
+                    trace_find_dirty_ring_end();
+                    break;
+                }
                 pss->block = qemu_get_ram_block(page << TARGET_PAGE_BITS);
                 pss->page = page - (pss->block->offset >> TARGET_PAGE_BITS);
                 pss->complete_round = false;
+                trace_find_dirty_ring_end();
                 pages = ram_save_host_page(rs, pss);
                 if (pages) {
                     break;

@@ -124,6 +124,10 @@ postcopy_preempt_hit(char *str, uint64_t offset) "ramblock %s offset 0x%"PRIx64
 postcopy_preempt_send_host_page(char *str, uint64_t offset) "ramblock %s offset 0x%"PRIx64
 postcopy_preempt_switch_channel(int channel) "%d"
 postcopy_preempt_reset_channel(void) ""
+find_dirty_bitmap_start(void) ""
+find_dirty_bitmap_end(void) ""
+find_dirty_ring_start(void) ""
+find_dirty_ring_end(void) ""
 
 # multifd.c
 multifd_new_send_channel_async(uint8_t id) "channel %u"
